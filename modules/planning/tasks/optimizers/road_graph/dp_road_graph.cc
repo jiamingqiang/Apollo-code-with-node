@@ -173,7 +173,7 @@ bool DpRoadGraph::GenerateMinCostPath(
   for (size_t level = 1; level < path_waypoints.size(); ++level) {
     const auto &prev_dp_nodes = graph_nodes.back();
     const auto &level_points = path_waypoints[level];
-    graph_nodes.emplace_back();
+    graph_nodes.emplace_back(); //这里的emplace_back()直接在nodes的尾部创建一个类型的空对象，如果省去这一行，graph_nodes.back()会是一个空指针而报错。
     std::vector<std::future<void>> results;
     for (size_t i = 0; i < level_points.size(); ++i) {
       const auto &cur_point = level_points[i];

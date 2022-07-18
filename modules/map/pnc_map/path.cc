@@ -809,16 +809,16 @@ bool Path::GetProjection(const Vec2d& point, double* accumulate_s,
   }
   *min_distance = std::sqrt(*min_distance);
   const auto& nearest_seg = segments_[min_index];
-  const auto prod = nearest_seg.ProductOntoUnit(point);
-  const auto proj = nearest_seg.ProjectOntoUnit(point);
-  if (min_index == 0) {
+  const auto prod = nearest_seg.ProductOntoUnit(point);  //查乘 是向量
+  const auto proj = nearest_seg.ProjectOntoUnit(point); //点乘 是数
+  if (min_index == 0) {  //第一个点
     *accumulate_s = std::min(proj, nearest_seg.length());
     if (proj < 0) {
       *lateral = prod;
     } else {
       *lateral = (prod > 0.0 ? 1 : -1) * *min_distance;
     }
-  } else if (min_index == num_segments_ - 1) {
+  } else if (min_index == num_segments_ - 1) {   //最后一个点
     *accumulate_s = accumulated_s_[min_index] + std::max(0.0, proj);
     if (proj > 0) {
       *lateral = prod;
