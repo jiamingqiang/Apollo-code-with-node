@@ -110,7 +110,7 @@ void QuinticPolynomialCurve1d::ComputeCoefficients(
     const double dx1, const double ddx1, const double p) {
   CHECK_GT(p, 0.0);
 
-  coef_[0] = x0;，
+  coef_[0] = x0;
   coef_[1] = dx0;
   coef_[2] = ddx0 / 2.0;
 

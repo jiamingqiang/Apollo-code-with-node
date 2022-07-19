@@ -56,7 +56,7 @@ TrajectoryCost::TrajectoryCost(const DpPolyPathConfig &config,
     } else if (ptr_obstacle->LongitudinalDecision().has_stop()) {
       continue;
     }
-    const auto &sl_boundary  = ptr_obstacle->PerceptionSLBoundary();
+    const auto &sl_boundary  = ptr_obstacle->PerceptionSLBoundary();  //障碍物的sl边界；
     //自车左边界
     const double adc_left_l  = init_sl_point_.l() + vehicle_param_.left_edge_to_center();
     //自车右边界
@@ -64,7 +64,7 @@ TrajectoryCost::TrajectoryCost(const DpPolyPathConfig &config,
 
     if (adc_left_l + FLAGS_lateral_ignore_buffer < sl_boundary.start_l() ||
         adc_right_l - FLAGS_lateral_ignore_buffer > sl_boundary.end_l()) {
-      continue;
+      continue;     //撞不到的障碍物直接忽略掉
     }
 
     bool is_bycycle_or_pedestrian =
@@ -78,26 +78,27 @@ TrajectoryCost::TrajectoryCost(const DpPolyPathConfig &config,
       continue;
     } else if (ptr_obstacle->IsStatic() || is_bycycle_or_pedestrian) {
       // 静态障碍物
-      static_obstacle_sl_boundaries_.push_back(std::move(sl_boundary));
+      static_obstacle_sl_boundaries_.push_back(std::move(sl_boundary));  //行人或者静态障碍物存入边界值
     } else {
       // 依据时间得到动态障碍物
       std::vector<Box2d> box_by_time;
       //每一动态障碍物依据时间存入 box_by_time
       for (uint32_t t = 0; t <= num_of_time_stamps_; ++t) {
         TrajectoryPoint trajectory_point =
-            ptr_obstacle->GetPointAtTime(t * config.eval_time_interval());
+            ptr_obstacle->GetPointAtTime(t * config.eval_time_interval());  //障碍物的轨迹根据时间进行插值
 
-        Box2d obstacle_box = ptr_obstacle->GetBoundingBox(trajectory_point);
+        Box2d obstacle_box = ptr_obstacle->GetBoundingBox(trajectory_point);  //得到障碍物的边界框信息包括长宽，位姿等。
         static constexpr double kBuff = 0.5;
         Box2d expanded_obstacle_box =
             Box2d(obstacle_box.center(), obstacle_box.heading(),
-                  obstacle_box.length() + kBuff, obstacle_box.width() + kBuff);
+                  obstacle_box.length() + kBuff, obstacle_box.width() + kBuff);  //对障碍物的边界框进行扩展膨胀
         box_by_time.push_back(expanded_obstacle_box);
+        //对于每一个动态障碍物，根据总时间和设置的时间间隔把动态障碍物的运动轨迹分散成一份一份的，对动态障碍物的边界框进行膨胀，完事后放入一个二维数组里，行是每个障碍物，列是这个障碍物一定时间内离散的膨胀的边界框轨迹
       }
       // 每一动态障碍物序列压入
       dynamic_obstacle_boxes_.push_back(std::move(box_by_time));
     }
-  }
+  }  //这是对障碍物的一个处理
 }
 
 
@@ -107,7 +108,10 @@ ComparableCost TrajectoryCost::CalculatePathCost(
     const double end_s, const uint32_t curr_level, const uint32_t total_level) {
   ComparableCost cost;
   double path_cost = 0.0;
-  std::function<double(const double)> quasi_softmax = [this](const double x) {
+  std::function<double(const double)> quasi_softmax = [this](const double x) { //[this] 捕获当前类中的
+  // this 指针，让 lambda 表达式拥有和当前类成员函数同样的访问权限。
+  //如果已经使用了 & 或者 =，就默认添加此选项。捕获 this 的目的是可以在 lamda 
+  //中使用当前类的成员函数和成员变量
     const double l0 = this->config_.path_l_cost_param_l0();
     const double b = this->config_.path_l_cost_param_b();
     const double k = this->config_.path_l_cost_param_k();
@@ -134,7 +138,7 @@ ComparableCost TrajectoryCost::CalculatePathCost(
     path_cost += ddl * ddl * config_.path_ddl_cost();
   }
   path_cost *= config_.path_resolution();
-  // 最后一层，距离车道中心线的cost
+  // 最后一层，距离车道中心线的cost,就是说还是希望轨迹的最后再回到车道中心线上
   if (curr_level == total_level) {
     const double end_l = curve.Evaluate(0, end_s - start_s);
     path_cost +=
@@ -202,6 +206,7 @@ ComparableCost TrajectoryCost::CalculateStaticObstacleCost(
        curr_s += config_.path_resolution()) {
     const double curr_l = curve.Evaluate(0, curr_s - start_s); //用curr_s求出curr_l
     for (const auto &obs_sl_boundary : static_obstacle_sl_boundaries_) {
+      //对于每个静态障碍物，计算当前sl下的cost
       obstacle_cost += GetCostFromObsSL(curr_s, curr_l, obs_sl_boundary);
     }
   }
@@ -222,7 +227,7 @@ ComparableCost TrajectoryCost::CalculateDynamicObstacleCost(
   double time_stamp = 0.0;
   // for形成的两层循环
   // 外循环，依据time_stamp，拿到自车的信息，即ego_box
-  // 内循环，ego_box依次与所有的 dynamic_obstacle_boxes_ 计算cost
+  // 内循环，ego_box依次与同一时刻所有的 dynamic_obstacle_boxes_ 计算cost
   for (size_t index = 0; index < num_of_time_stamps_;
        ++index, time_stamp += config_.eval_time_interval()) {
     common::SpeedPoint speed_point;
@@ -282,7 +287,7 @@ ComparableCost TrajectoryCost::GetCostFromObsSL(
                      (adc_left_l + 0.1 < obs_sl_boundary.start_l() ||
                       adc_right_l - 0.1 > obs_sl_boundary.end_l()));  // lateral
 
-  if (!no_overlap) {
+  if (!no_overlap) {  //任何一个不成立，就撞了
     obstacle_cost.cost_items[ComparableCost::HAS_COLLISION] = true;
   }
 

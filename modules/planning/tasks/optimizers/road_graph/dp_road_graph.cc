@@ -157,34 +157,34 @@ bool DpRoadGraph::GenerateMinCostPath(
   for (size_t i = 1; i < first_row.size(); ++i) {
     if (std::fabs(first_row[i].l() - init_sl_point_.l()) <
         std::fabs(first_row[nearest_i].l() - init_sl_point_.l())) {
-      nearest_i = i;
+      nearest_i = i;  // 相当于把上次的i给到nearest_i,和下次的i计算比较
     }
   }
   graph_nodes.emplace_back();
   graph_nodes.back().emplace_back(first_row[nearest_i], nullptr,
-                                  ComparableCost());
+                                  ComparableCost());  //调用三个参数的构造函数赋值，把最近的点放入graph_nodes的第一个值
   auto &front = graph_nodes.front().front();
   size_t total_level = path_waypoints.size();
-
+   //  以上就是在撒点的第一层找到距离初始sl点最近的点存到graph_nodes的第一个
   // 构建 graph_nodes
   // 两层循环:
   //          外循环 -- 撒点的列数；
   //          内循环 -- 列中的每个点
   for (size_t level = 1; level < path_waypoints.size(); ++level) {
-    const auto &prev_dp_nodes = graph_nodes.back();
-    const auto &level_points = path_waypoints[level];
+    const auto &prev_dp_nodes = graph_nodes.back();//这是第一层 只有距离初始sl最近的一个点，
+    const auto &level_points = path_waypoints[level]; //循环从第二层开始找；
     graph_nodes.emplace_back(); //这里的emplace_back()直接在nodes的尾部创建一个类型的空对象，如果省去这一行，graph_nodes.back()会是一个空指针而报错。
     std::vector<std::future<void>> results;
     for (size_t i = 0; i < level_points.size(); ++i) {
       const auto &cur_point = level_points[i];
       graph_nodes.back().emplace_back(cur_point, nullptr);
       auto msg = std::make_shared<RoadGraphMessage>(
-          prev_dp_nodes, level, total_level, &trajectory_cost, &front,
+          prev_dp_nodes, level, total_level, &trajectory_cost, &front,//front是第一个点
           &(graph_nodes.back().back()));
       if (FLAGS_enable_multi_thread_in_dp_poly_path) {
         results.emplace_back(cyber::Async(&DpRoadGraph::UpdateNode, this, msg));
       } else {
-        UpdateNode(msg);
+        UpdateNode(msg);//msg内容包括：上一个点，当前层，总层数，轨迹cost对象，第一个点，当前点。
       }
     }
     if (FLAGS_enable_multi_thread_in_dp_poly_path) {
@@ -238,8 +238,8 @@ void DpRoadGraph::UpdateNode(const std::shared_ptr<RoadGraphMessage> &msg) {
   CHECK_NOTNULL(msg->front);
   CHECK_NOTNULL(msg->cur_node);
   for (const auto &prev_dp_node : msg->prev_nodes) {
-    const auto &prev_sl_point = prev_dp_node.sl_point;
-    const auto &cur_point = msg->cur_node->sl_point;
+    const auto &prev_sl_point = prev_dp_node.sl_point;  //上一层的点
+    const auto &cur_point = msg->cur_node->sl_point; //当前点
     double init_dl = 0.0;
     double init_ddl = 0.0;
     if (msg->level == 1) {

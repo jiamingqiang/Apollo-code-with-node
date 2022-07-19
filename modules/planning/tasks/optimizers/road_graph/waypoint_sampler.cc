@@ -60,9 +60,9 @@ bool WaypointSampler::SamplePathWaypoints(
       reference_line_info_->reference_line().Length());
   const auto &vehicle_config = common::VehicleConfigHelper::Instance()->GetConfig();
   // 车宽的一半
-  const double half_adc_width = vehicle_config.vehicle_param().width() / 2.0;
+  const double half_adc_width = vehicle_config.vehicle_param().width() / 2.0;                 
   // 每一纵列撒点数
-  const double num_sample_per_level =
+  const double num_sample_per_level =    //每一层的撒点数
       FLAGS_use_navigation_mode ? config_.navigator_sample_num_each_level()
                                 : config_.sample_points_num_each_level();
 
@@ -71,6 +71,9 @@ bool WaypointSampler::SamplePathWaypoints(
   const double level_distance =
       common::math::Clamp(init_point.v() * kSamplePointLookForwardTime,
                           config_.step_length_min(), config_.step_length_max());
+
+  //以上是 撒多远 每一层撒多少点 每一层的间隔是多少
+
   // 初始s
   double accumulated_s = init_sl_point_.s();
   double prev_s = accumulated_s;
@@ -85,7 +88,7 @@ bool WaypointSampler::SamplePathWaypoints(
     const double s = std::fmin(accumulated_s, total_length);
     static constexpr double kMinAllowedSampleStep = 1.0;    // 最小采样间隔
     if (std::fabs(s - prev_s) < kMinAllowedSampleStep) {
-      continue;                       //采样间隔过小则不进行处理
+      continue;                       //采样间隔过小则不进行处理，就是说两次采样之间不能小于1米
     }
     prev_s = s;
 
@@ -99,7 +102,7 @@ bool WaypointSampler::SamplePathWaypoints(
     const double eff_right_width = right_width - half_adc_width - kBoundaryBuff;
     const double eff_left_width = left_width - half_adc_width - kBoundaryBuff;
 
-    // the heuristic shift of L for lane change scenarios
+    // 换道场景下的L变化
     const double delta_dl = 1.2 / 20.0;
     // 换道场景的L变化量，（初始斜率+预设变化率delta_dl）* level_distance
     const double kChangeLaneDeltaL = common::math::Clamp(
@@ -111,14 +114,14 @@ bool WaypointSampler::SamplePathWaypoints(
         LaneChangeDecider::IsClearToChangeLane(reference_line_info_)) {
       kDefaultUnitL = 1.0;
     }
-    const double sample_l_range = kDefaultUnitL * (num_sample_per_level - 1);
+    const double sample_l_range = kDefaultUnitL * (num_sample_per_level - 1);  //换道场景下l的范围是：初始斜率+预设变化率delta_dl）* level_distance
     double sample_right_boundary = -eff_right_width;
     double sample_left_boundary = eff_left_width;
 
-    static constexpr double kLargeDeviationL = 1.75;
-    static constexpr double kTwentyMilesPerHour = 8.94; //速度 1miles = 1.6km, 20*1.6/3.6 = 8.9m/s
+    static constexpr double kLargeDeviationL = 1.75; //最大偏差
+    static constexpr double kTwentyMilesPerHour = 8.94; //速度 1miles = 1.6km, 20*1.6/3.6 = 8.9m/s   20英里每小时 32km/h 也就是8.9m/s
     if (reference_line_info_->IsChangeLanePath() ||
-        std::fabs(init_sl_point_.l()) > kLargeDeviationL) {
+        std::fabs(init_sl_point_.l()) > kLargeDeviationL) {  //初始点的l大于最大偏差了
       if (injector_->ego_info()->start_point().v() > kTwentyMilesPerHour) {
         sample_right_boundary = std::fmin(-eff_right_width, init_sl_point_.l());
         sample_left_boundary = std::fmax(eff_left_width, init_sl_point_.l());
@@ -133,6 +136,8 @@ bool WaypointSampler::SamplePathWaypoints(
         }
       }
     }
+     //以上都是在确定采样的左右边界
+
 
     std::vector<double> sample_l;
     if (reference_line_info_->IsChangeLanePath() &&
@@ -147,7 +152,7 @@ bool WaypointSampler::SamplePathWaypoints(
     }
     std::vector<common::SLPoint> level_points;
     planning_internal::SampleLayerDebug sample_layer_debug;
-    //一次把每列的点存入level_points
+    //依次把每列的点存入level_points
     for (size_t j = 0; j < sample_l.size(); ++j) {
       common::SLPoint sl =
           common::util::PointFactory::ToSLPoint(s, sample_l[j]);
