@@ -132,8 +132,8 @@ Status GriddedPathTimeGraph::Search(SpeedData* const speed_data) {
     }
   }
 
-  // 1 初始化CostTable
-  if (!InitCostTable().ok()) {
+  // 1 初始化CostTable,把一对对的(s,t)的值放入vector里
+  if (!InitCostTable().ok()) {  
     const std::string msg = "Initialize cost table failed.";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
@@ -211,7 +211,8 @@ Status GriddedPathTimeGraph::InitCostTable() {
 
   // cost_table_为双层vector，外层是t，内层是s，
   cost_table_ = std::vector<std::vector<StGraphPoint>>(
-                dimension_t_, std::vector<StGraphPoint>(dimension_s_, StGraphPoint()));
+                dimension_t_, std::vector<StGraphPoint>(dimension_s_, StGraphPoint()));//dimension_t_是二维vector的维度，
+                //dimension_s_是一维vector的维度，StGraphPoint()才是初始化的值
 
   double curr_t = 0.0;        // 起点 t = 0
   for (uint32_t i = 0; i < cost_table_.size(); ++i, curr_t += unit_t_) {
@@ -271,7 +272,7 @@ Status GriddedPathTimeGraph::CalculateTotalCost() {
   size_t next_lowest_row  = 0;
 
   // 外循环，每一列的index，即每一个t
-  for (size_t c = 0; c < cost_table_.size(); ++c) {
+  for (size_t c = 0; c < cost_table_.size(); ++c) {    //cost_table_上面求出的ST图
     size_t highest_row = 0;
     size_t lowest_row  = cost_table_.back().size() - 1;
 
@@ -286,7 +287,7 @@ Status GriddedPathTimeGraph::CalculateTotalCost() {
           results.push_back(cyber::Async(&GriddedPathTimeGraph::CalculateCostAt, 
                             this, msg));
         } else {
-          CalculateCostAt(msg);
+          CalculateCostAt(msg); //相当于把每个t下的每个s放入msg里计算cost;
         }
       }
       if (FLAGS_enable_multi_thread_in_dp_st_graph) {
@@ -299,14 +300,14 @@ Status GriddedPathTimeGraph::CalculateTotalCost() {
     // 下一轮循环的准备工作
     // 遍历当前列中行号在[next_lowest_row,next_highest_row] 的点，
     // 找到 highest_row 和 lowest_row，
-    // 以此来更新下一轮循环需要的next_highest_row、next_lowest_row
+    // 以此来更新下一轮循环需要的next_highest_row、next_lowest_row, 只是算有效范围内的点，并不是都算
     for (size_t r = next_lowest_row; r <= next_highest_row; ++r) {
       const auto& cost_cr = cost_table_[c][r];
       if (cost_cr.total_cost() < std::numeric_limits<double>::infinity()) {
         size_t h_r = 0;
         size_t l_r = 0;
         GetRowRange(cost_cr, &h_r, &l_r);
-        highest_row = std::max(highest_row, h_r);
+        highest_row = std::max(highest_row, h_r);  
         lowest_row  = std::min( lowest_row, l_r);
       }
     }
@@ -376,10 +377,10 @@ void GriddedPathTimeGraph::GetRowRange(const StGraphPoint& point,
  *    4、EdgeCost，由三部分构成      Speedcost、AccelCost、JerkCost
  * *************************************************************************/
 void GriddedPathTimeGraph::CalculateCostAt(
-    const std::shared_ptr<StGraphMessage>& msg) {
-  const uint32_t c = msg->c;
+    const std::shared_ptr<StGraphMessage>& msg) {  
+  const uint32_t c = msg->c; //传过来的是每个当前点
   const uint32_t r = msg->r;
-  auto& cost_cr = cost_table_[c][r];
+  auto& cost_cr = cost_table_[c][r];  //cr下的class;
 
   // 1、计算 obstacle_cost，如果为无穷大，则停止，
   cost_cr.SetObstacleCost(dp_st_cost_.GetObstacleCost(cost_cr));
@@ -407,7 +408,7 @@ void GriddedPathTimeGraph::CalculateCostAt(
 
   //第一列的特殊处理
   if (c == 1) {
-    const double acc =    //当前点的加速度
+    const double acc =    //当前点的加速度,平均速度除以t;
         2 * (cost_cr.point().s() / unit_t_ - init_point_.v()) / unit_t_;
     //加速度、减速度超出范围，返回
     if (acc < max_deceleration_ || acc > max_acceleration_) {
@@ -575,7 +576,7 @@ Status GriddedPathTimeGraph::RetrieveSpeedProfile(SpeedData* const speed_data) {
   // 这里不直接将最后一列的min_cost点作为最佳终点呢？
   // 因为采样时间是一个预估时间，在此之前的各列最后一个点可能已经到达终点
   for (const auto& row : cost_table_) {
-    const StGraphPoint& cur_point = row.back();
+    const StGraphPoint& cur_point = row.back();  //每一列的最后一个点，也就是每个时刻能到的最远处；
     if (!std::isinf(cur_point.total_cost()) && cur_point.total_cost() < min_cost) {
       best_end_point = &cur_point;
       min_cost = cur_point.total_cost();
@@ -599,7 +600,7 @@ Status GriddedPathTimeGraph::RetrieveSpeedProfile(SpeedData* const speed_data) {
     speed_point.set_s(cur_point->point().s());
     speed_point.set_t(cur_point->point().t());
     speed_profile.push_back(speed_point);
-    cur_point = cur_point->pre_point();
+    cur_point = cur_point->pre_point(); //把当前点的前一个点的地址给到当前点的地址，以此达到回溯的目的
   }
   std::reverse(speed_profile.begin(), speed_profile.end());
 
@@ -631,9 +632,9 @@ Status GriddedPathTimeGraph::RetrieveSpeedProfile(SpeedData* const speed_data) {
 double GriddedPathTimeGraph::CalculateEdgeCost(
     const STPoint& first, const STPoint& second, const STPoint& third,
     const STPoint& forth, const double speed_limit, const double cruise_speed) {
-  return dp_st_cost_.GetSpeedCost(third, forth, speed_limit, cruise_speed) +
-         dp_st_cost_.GetAccelCostByThreePoints(second, third, forth) +
-         dp_st_cost_.GetJerkCostByFourPoints(first, second, third, forth);
+  return dp_st_cost_.GetSpeedCost(third, forth, speed_limit, cruise_speed) +   //速度的惩罚是针对两s之间求出的速度和限速的惩罚
+         dp_st_cost_.GetAccelCostByThreePoints(second, third, forth) +    //加速度的惩罚是两个s求出的加速度和车辆自身的最大最小加速度之间的惩罚
+         dp_st_cost_.GetJerkCostByFourPoints(first, second, third, forth); //jerk的惩罚就是jerk平方的惩罚这个没有参考值
 }
 
 /********************************************************************************

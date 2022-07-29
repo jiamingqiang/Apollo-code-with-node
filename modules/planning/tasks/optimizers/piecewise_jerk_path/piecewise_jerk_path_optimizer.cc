@@ -328,10 +328,10 @@ bool PiecewiseJerkPathOptimizer::OptimizePath(
   const double jerk_bound = EstimateJerkBoundary(std::fmax(init_state[1], 1.0),
                                                  axis_distance, max_yaw_rate);
   piecewise_jerk_problem.set_dddx_bound(jerk_bound);
-
-  // 上面做了那么多的 set
+  
+  // 上面做了那么多的 set，设置约束条件
   //  一通操作猛如虎，这一步才是关键啊，求解！！！
-  bool success = piecewise_jerk_problem.Optimize(max_iter);
+  bool success = piecewise_jerk_problem.Optimize(max_iter);  /// QP求解，上面的set都是在设置约束条件
 
   auto end_time = std::chrono::system_clock::now();
   std::chrono::duration<double> diff = end_time - start_time;

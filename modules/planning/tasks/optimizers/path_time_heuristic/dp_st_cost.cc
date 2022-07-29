@@ -151,7 +151,7 @@ double DpStCost::GetObstacleCost(const StGraphPoint& st_graph_point) {
       continue;
     }
 
-    auto boundary = obstacle->path_st_boundary();
+    auto boundary = obstacle->path_st_boundary();  //障碍物的边界
 
     if (boundary.min_s() > FLAGS_speed_lon_decision_horizon) {
       continue;
@@ -221,7 +221,7 @@ double DpStCost::GetSpeedCost(const STPoint& first, const STPoint& second,
                               const double speed_limit,
                               const double cruise_speed) const {
   double cost = 0.0;
-  const double speed = (second.s() - first.s()) / unit_t_;
+  const double speed = (second.s() - first.s()) / unit_t_;//说明规划的速度就是用前后两个点的s/t得到的
   if (speed < 0) {
     return kInf;
   }
@@ -263,11 +263,11 @@ double DpStCost::GetAccelCost(const double accel) {
   static constexpr size_t kShift = 100;
   const size_t accel_key = static_cast<size_t>(accel / kEpsilon + 0.5 + kShift);
   DCHECK_LT(accel_key, accel_cost_.size());
-  if (accel_key >= accel_cost_.size()) {
+  if (accel_key >= accel_cost_.size()) {//就是accel大于10；
     return kInf;
   }
 
-  if (accel_cost_.at(accel_key) < 0.0) {
+  if (accel_cost_.at(accel_key) < 0.0) { //就是accel小于-10；
     const double accel_sq = accel * accel;
     double max_acc = config_.max_acceleration();
     double max_dec = config_.max_deceleration();
@@ -302,7 +302,7 @@ double DpStCost::GetAccelCostByThreePoints(const STPoint& first,
 double DpStCost::GetAccelCostByTwoPoints(const double pre_speed,
                                          const STPoint& pre_point,
                                          const STPoint& curr_point) {
-  double current_speed = (curr_point.s() - pre_point.s()) / unit_t_;
+  double current_speed = (curr_point.s() - pre_point.s()) / unit_t_; //说明规划的速度就是两个点之间的s除以离散的时间t
   double accel = (current_speed - pre_speed) / unit_t_;
   return GetAccelCost(accel);
 }

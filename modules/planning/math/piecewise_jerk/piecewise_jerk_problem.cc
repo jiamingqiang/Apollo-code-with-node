@@ -160,7 +160,7 @@ bool PiecewiseJerkProblem::Optimize(const int max_iter) {
  * 计算约束条件的 A 矩阵
  * 
  * *****************************************************************************/
-void PiecewiseJerkProblem::CalculateAffineConstraint(
+void PiecewiseJerkProblem:: (
     std::vector<c_float>* A_data, std::vector<c_int>* A_indices,
     std::vector<c_int>* A_indptr, std::vector<c_float>* lower_bounds,
     std::vector<c_float>* upper_bounds) {
@@ -168,7 +168,7 @@ void PiecewiseJerkProblem::CalculateAffineConstraint(
   // 3(N-1)  连续性约束
   // 3个     初始约束
   const int n = static_cast<int>(num_of_knots_);
-  const int num_of_variables = 3 * n;                                // 决策变量个数
+  const int num_of_variables = 3 * n;                                // 决策变量个数，因为每个knots都有0 1阶导 2阶导共三个状态
   const int num_of_constraints = num_of_variables + 3 * (n - 1) + 3; // 约束条件的个数
   lower_bounds->resize(num_of_constraints);
   upper_bounds->resize(num_of_constraints);
