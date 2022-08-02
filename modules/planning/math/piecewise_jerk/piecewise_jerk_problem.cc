@@ -160,7 +160,7 @@ bool PiecewiseJerkProblem::Optimize(const int max_iter) {
  * 计算约束条件的 A 矩阵
  * 
  * *****************************************************************************/
-void PiecewiseJerkProblem:: (
+void PiecewiseJerkProblem::CalculateAffineConstraint(
     std::vector<c_float>* A_data, std::vector<c_int>* A_indices,
     std::vector<c_int>* A_indptr, std::vector<c_float>* lower_bounds,
     std::vector<c_float>* upper_bounds) {
@@ -177,7 +177,7 @@ void PiecewiseJerkProblem:: (
 
   int constraint_index = 0;
 
-  // set x, x', x'' bounds
+  // set x, x', x'' bounds，分别设置x,x',x''的上下限
   for (int i = 0; i < num_of_variables; ++i) {
     if (i < n) {
       variables[i].emplace_back(constraint_index, 1.0);
@@ -205,38 +205,38 @@ void PiecewiseJerkProblem:: (
 
   // x" 加速度约束
   // x(i->i+1)''' = (x(i+1)'' - x(i)'') / delta_s
-  for (int i = 0; i + 1 < n; ++i) {
+  for (int i = 0; i + 1 < n; ++i) {    //
     variables[2 * n + i].emplace_back(constraint_index, -1.0);
     variables[2 * n + i + 1].emplace_back(constraint_index, 1.0);
     lower_bounds->at(constraint_index) = dddx_bound_.first * delta_s_ * scale_factor_[2];
     upper_bounds->at(constraint_index) = dddx_bound_.second * delta_s_ * scale_factor_[2];
-    ++constraint_index;
+    ++constraint_index;  //constraint_index = 3n +i
   }
 
   // x' 速度连续性约束
   // x(i+1)' - x(i)' -  0.5*delta_s *x(i)'' -  0.5*delta_s *x(i+1)'' = 0
-  for (int i = 0; i + 1 < n; ++i) {
+  for (int i = 0; i + 1 < n; ++i) {///把这个等式编进去说明在这几个位置的变量满足这个等式关系
     variables[n + i    ].emplace_back(constraint_index, -1.0 * scale_factor_[2]);
     variables[n + i + 1].emplace_back(constraint_index,  1.0 * scale_factor_[2]);
     variables[2 * n + i].emplace_back(constraint_index, -0.5 * delta_s_ * scale_factor_[1]);
     variables[2*n + i+1].emplace_back(constraint_index, -0.5 * delta_s_ * scale_factor_[1]);
     lower_bounds->at(constraint_index) = 0.0;
     upper_bounds->at(constraint_index) = 0.0;
-    ++constraint_index;
+    ++constraint_index; //constraint_index =4n +i
   }
 
   // x 位置连续性约束
   // x(i+1) =  x(i) + delta_s * x(i)' + 1/3* delta_s^2 * x(i)'' + 1/6* delta_s^2 * x(i+1)''
   auto delta_s_sq_ = delta_s_ * delta_s_;
-  for (int i = 0; i + 1 < n; ++i) {
+  for (int i = 0; i + 1 < n; ++i) {  ///把这个等式编进去说明在这几个位置的变量满足这个等式关系
     variables[i        ].emplace_back(constraint_index, -1.0 * scale_factor_[1] * scale_factor_[2]);
     variables[i   + 1  ].emplace_back(constraint_index,  1.0 * scale_factor_[1] * scale_factor_[2]);
     variables[n   + i  ].emplace_back(constraint_index, -delta_s_ * scale_factor_[0] * scale_factor_[2]);
     variables[2*n + i  ].emplace_back(constraint_index, -delta_s_sq_ / 3.0 * scale_factor_[0] * scale_factor_[1]);
     variables[2*n + i+1].emplace_back(constraint_index, -delta_s_sq_ / 6.0 * scale_factor_[0] * scale_factor_[1]);
     lower_bounds->at(constraint_index) = 0.0;
-    upper_bounds->at(constraint_index) = 0.0;
-    ++constraint_index;
+    upper_bounds->at(constraint_index) = 0.0; //转化成等式 上下界就都是0了
+    ++constraint_index; //constraint_index =5n +i
   }
 
   // 初始状态约束
